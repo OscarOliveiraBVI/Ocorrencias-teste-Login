@@ -63,18 +63,17 @@ def criar_excel_oficial(df):
     return output.getvalue()
 
 # --- INTERFACE ---
-st.set_page_config(page_title="BVI - Gestão", page_icon="🚒", layout="wide")
+st.set_page_config(page_title="BVI - Ocorrências ", page_icon="🚒", layout="wide")
 if os.path.exists(LOGO_FILE): st.sidebar.image(LOGO_FILE, width=150)
 
-st.title("🚒 Sistema BVI")
+st.title("🚒 Ocorrências Ativas")
 t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 
 with t1:
     with st.form("f_novo", clear_on_submit=True):
         st.subheader("Nova Ocorrência:")
-        c1, c2 = st.columns(2)
-        nr = c1.text_input("📕 OCORRÊNCIA Nº")
-        hr = c2.text_input("🕜 HORA")
+        nr = st.text_input("📕 OCORRÊNCIA Nº")
+        hr = st.text_input("🕜 HORA")
         mot = st.text_input("🦺 MOTIVO") 
         sex = st.text_input("👨 SEXO/IDADE") 
         loc = st.text_input("📍 LOCALIDADE")
@@ -162,3 +161,4 @@ with t2:
             st.error(f"❌ Erro: {e}")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+
