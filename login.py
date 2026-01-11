@@ -28,10 +28,15 @@ def limpar_texto(txt):
 
 def formatar_sexo(texto):
     if not texto.strip(): return "Não especificado"
-    t = texto.strip().upper()
-    genero = "Masculino" if t.startswith("M") else "Feminino" if t.startswith("F") else ""
+    t_upper = texto.strip().upper()
+    
+    # Se já tiver a palavra completa, não duplica
+    if "MASCULINO" in t_upper or "FEMININO" in t_upper:
+        return texto.strip().capitalize()
+        
+    genero = "Masculino" if t_upper.startswith("M") else "Feminino" if t_upper.startswith("F") else ""
     if genero:
-        idade = ''.join(filter(str.isdigit, t))
+        idade = ''.join(filter(str.isdigit, t_upper))
         return f"{genero} de {idade} anos" if idade else genero
     return texto.capitalize()
 
@@ -63,17 +68,18 @@ def criar_excel_oficial(df):
     return output.getvalue()
 
 # --- INTERFACE ---
-st.set_page_config(page_title="BVI - Ocorrências ", page_icon="logo.png", layout="centered")
+st.set_page_config(page_title="BVI - Gestão", page_icon="🚒", layout="wide")
 if os.path.exists(LOGO_FILE): st.sidebar.image(LOGO_FILE, width=150)
 
-st.title("🚒 Ocorrências Ativas")
+st.title("🚒 Sistema BVI")
 t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 
 with t1:
     with st.form("f_novo", clear_on_submit=True):
         st.subheader("Nova Ocorrência:")
-        nr = st.text_input("📕 OCORRÊNCIA Nº")
-        hr = st.text_input("🕜 HORA")
+        c1, c2 = st.columns(2)
+        nr = c1.text_input("📕 OCORRÊNCIA Nº")
+        hr = c2.text_input("🕜 HORA")
         mot = st.text_input("🦺 MOTIVO") 
         sex = st.text_input("👨 SEXO/IDADE") 
         loc = st.text_input("📍 LOCALIDADE")
@@ -91,7 +97,6 @@ with t1:
                 nomes = [mapa[n] for n in ops]
                 data_agora = datetime.now().strftime("%d/%m/%Y %H:%M")
                 
-                # Dados para o Supabase
                 nova_linha = {
                     "numero": nr.upper(), "hora": formatar_hora(hr), "motivo": mot.title(),
                     "sexo": formatar_sexo(sex), "localidade": loc.title(), "morada": mor.title(),
@@ -100,10 +105,10 @@ with t1:
                 }
                 
                 try:
-                    # Grava na base de dados
+                    # Grava no Supabase
                     supabase.table("ocorrencias").insert(nova_linha).execute()
                     
-                    # Prepara cópia para o Discord SEM a data de envio
+                    # Discord (SEM data e COM nomes visuais)
                     dados_discord = nova_linha.copy()
                     del dados_discord["data_envio"]
                     
@@ -120,7 +125,7 @@ with t1:
                 except Exception as e:
                     st.error(f"❌ Erro ao guardar: {e}")
             else:
-                st.error("⚠️ Preencha tudo!")
+                st.error("⚠️ Preencha todos os campos!")
 
 with t2:
     if not st.session_state.get("autenticado", False):
@@ -154,7 +159,7 @@ with t2:
                 if 'id' in df_v.columns: df_v = df_v.drop(columns=['id'])
                 st.dataframe(df_v, use_container_width=True)
                 
-                st.download_button("📥 Excel", criar_excel_oficial(df_v), f"BVI_{datetime.now().year}.xlsx")
+                st.download_button("📥 Excel Oficial", criar_excel_oficial(df_v), f"BVI_{datetime.now().year}.xlsx")
             else:
                 st.info("Vazio.")
         except Exception as e:
