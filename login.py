@@ -20,8 +20,6 @@ except Exception as e:
     st.error("⚠️ Verifica os Secrets no Streamlit Cloud!")
     st.stop()
 
-LOGO_FILE = "logo.png"
-
 def limpar_texto(txt):
     return ''.join(c for c in unicodedata.normalize('NFD', txt) 
                   if unicodedata.category(c) != 'Mn').upper()
@@ -29,13 +27,19 @@ def limpar_texto(txt):
 def formatar_sexo(texto):
     if not texto.strip(): return "Não especificado"
     t_upper = texto.strip().upper()
-    if "MASCULINO" in t_upper or "FEMININO" in t_upper:
-        return texto.strip().capitalize()
-    genero = "Masculino" if t_upper.startswith("M") else "Feminino" if t_upper.startswith("F") else ""
-    if genero:
-        idade = ''.join(filter(str.isdigit, t_upper))
-        return f"{genero} de {idade} anos" if idade else genero
-    return texto.capitalize()
+    
+    # Extrair apenas os números (idade)
+    idade = ''.join(filter(str.isdigit, t_upper))
+    
+    # Verificar apenas a primeira letra para definir o género
+    if t_upper.startswith("F"):
+        genero = "Feminino"
+    elif t_upper.startswith("M"):
+        genero = "Masculino"
+    else:
+        return texto.capitalize() # Caso não comece por M ou F, mantém o que foi escrito
+        
+    return f"{genero} de {idade} anos" if idade else genero
 
 def formatar_hora(texto):
     t = texto.strip().replace(":", "").replace(".", "")
@@ -63,21 +67,22 @@ def criar_excel_oficial(df):
     return output.getvalue()
 
 # --- INTERFACE ---
-st.set_page_config(page_title="BVI - Ocorrências", page_icon="logo.png", layout="centered")
+st.set_page_config(page_title="BVI - Gestão", page_icon="🚒", layout="wide")
 
 # MOSTRAR UTILIZADOR NA SIDEBAR SE ESTIVER LOGADO
 if st.session_state.get("autenticado", False):
     st.sidebar.markdown(f"👤 **Utilizador:** {ADMIN_USER}")
     st.sidebar.button("Sair", on_click=lambda: st.session_state.update({"autenticado": False}))
 
-st.title("🚒 Registo de Ocorrências")
+st.title("🚒 Sistema BVI")
 t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 
 with t1:
     with st.form("f_novo", clear_on_submit=True):
         st.subheader("Nova Ocorrência:")
-        nr = st.text_input("📕 OCORRÊNCIA Nº")
-        hr = st.text_input("🕜 HORA")
+        c1, c2 = st.columns(2)
+        nr = c1.text_input("📕 OCORRÊNCIA Nº")
+        hr = c2.text_input("🕜 HORA")
         mot = st.text_input("🦺 MOTIVO") 
         sex = st.text_input("👨 SEXO/IDADE") 
         loc = st.text_input("📍 LOCALIDADE")
@@ -162,4 +167,3 @@ with t2:
             st.error(f"❌ Erro: {e}")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
-
