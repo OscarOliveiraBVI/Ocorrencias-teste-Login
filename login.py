@@ -64,7 +64,7 @@ def criar_excel_oficial(df):
     return output.getvalue()
 
 
-st.set_page_config(page_title="BVI - Ocorrências", page_icon="logo.png", layout="centered"))
+st.set_page_config(page_title="BVI - Ocorrências", page_icon="logo.png", layout="centered")
 
 if st.session_state.get("autenticado", False):
     st.sidebar.markdown(f"👤 **Utilizador:** {ADMIN_USER}")
@@ -167,5 +167,6 @@ with t2:
             st.error(f"❌ Erro: {e}")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+
 
 
