@@ -63,7 +63,7 @@ def criar_excel_oficial(df):
     return output.getvalue()
 
 # --- INTERFACE ---
-st.set_page_config(page_title="BVI - Gestão", page_icon="🚒", layout="centered")
+st.set_page_config(page_title="BVI - Gestão", page_icon="🚒", layout="wide")
 if os.path.exists(LOGO_FILE): st.sidebar.image(LOGO_FILE, width=150)
 
 st.title("🚒 Sistema BVI")
@@ -72,8 +72,9 @@ t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 with t1:
     with st.form("f_novo", clear_on_submit=True):
         st.subheader("Nova Ocorrência:")
-        nr = st.text_input("📕 OCORRÊNCIA Nº")
-        hr = st.text_input("🕜 HORA")
+        c1, c2 = st.columns(2)
+        nr = c1.text_input("📕 OCORRÊNCIA Nº")
+        hr = c2.text_input("🕜 HORA")
         mot = st.text_input("🦺 MOTIVO") 
         sex = st.text_input("👨 SEXO/IDADE") 
         loc = st.text_input("📍 LOCALIDADE")
@@ -91,7 +92,6 @@ with t1:
                 nomes = [mapa[n] for n in ops]
                 data_agora = datetime.now().strftime("%d/%m/%Y %H:%M")
                 
-                # Dados para o Supabase (Nomes Simples)
                 nova_linha = {
                     "numero": nr.upper(), "hora": formatar_hora(hr), "motivo": mot.title(),
                     "sexo": formatar_sexo(sex), "localidade": loc.title(), "morada": mor.title(),
@@ -101,25 +101,24 @@ with t1:
                 
                 try:
                     supabase.table("ocorrencias").insert(nova_linha).execute()
-                    
-                    # Enviar para o Discord com emojis (Visual)
                     msg = f"🔥 **Nova Ocorrência {nr.upper()}**\n🕜 {hr}\n🦺 {mot.title()}\n📍 {loc.title()}\n🚒 {', '.join(meios)}"
                     requests.post(DISCORD_WEBHOOK_URL, json={"content": msg})
-                    
                     st.success("✅ Ocorrência guardada!")
                 except Exception as e:
                     st.error(f"❌ Erro ao guardar: {e}")
             else:
-                st.error("⚠️ Preencha os campos!")
+                st.error("⚠️ Preencha todos os campos!")
 
 with t2:
     if not st.session_state.get("autenticado", False):
-        u = st.text_input("Utilizador")
-        s = st.text_input("Senha", type="password")
+        u = st.text_input("Utilizador", key="user_input")
+        s = st.text_input("Senha", type="password", key="pass_input")
         if st.button("Entrar"):
             if u == ADMIN_USER and s == ADMIN_PASSWORD:
                 st.session_state.autenticado = True
                 st.rerun()
+            else:
+                st.error("Incorreto.")
     else:
         st.sidebar.button("Sair", on_click=lambda: st.session_state.update({"autenticado": False}))
         
@@ -128,7 +127,35 @@ with t2:
             if res.data:
                 df = pd.DataFrame(res.data)
                 
-                # TRADUÇÃO DOS NOMES PARA O UTILIZADOR
+                # Tradução das colunas da Base de Dados para o utilizador
                 mapa_colunas = {
-                    "numero": "📕 OCORRÊNCIA Nº", "hora": "🕜 HORA", "motivo": "🦺 MOTIVO",
-                    "sexo": "👨 SEXO/IDADE", "localidade": "📍 LOCALIDADE", "morada": "🏠 MORADA",
+                    "numero": "📕 OCORRÊNCIA Nº", 
+                    "hora": "🕜 HORA", 
+                    "motivo": "🦺 MOTIVO",
+                    "sexo": "👨 SEXO/IDADE", 
+                    "localidade": "📍 LOCALIDADE", 
+                    "morada": "🏠 MORADA",
+                    "meios": "🚒 MEIOS", 
+                    "operacionais": "👨🏻‍🚒 OPERACIONAIS", 
+                    "outros": "🚨 OUTROS MEIOS", 
+                    "data_envio": "📅 DATA DO ENVIO"
+                }
+                df_visual = df.rename(columns=mapa_colunas)
+
+                st.subheader("📊 Totais por Mês")
+                df_visual['Mês'] = df_visual['📅 DATA DO ENVIO'].apply(mes_extenso)
+                st.table(df_visual.groupby('Mês').size().reset_index(name='Total'))
+
+                st.subheader("📋 Histórico")
+                if 'id' in df_visual.columns: 
+                    df_visual = df_visual.drop(columns=['id'])
+                
+                st.dataframe(df_visual, use_container_width=True)
+                
+                st.download_button("📥 Excel Oficial", criar_excel_oficial(df_visual), f"BVI_{datetime.now().year}.xlsx")
+            else:
+                st.info("A base de dados está vazia.")
+        except Exception as e:
+            st.error(f"❌ Erro ao carregar dados: {e}")
+
+st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
