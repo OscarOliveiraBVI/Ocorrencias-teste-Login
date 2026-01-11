@@ -9,19 +9,15 @@ from supabase import create_client, Client
 
 # --- CONFIGURAÇÃO E SEGREDOS ---
 try:
-    # Supabase (Base de Dados Real)
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-    
-    # Discord e Acesso
     DISCORD_WEBHOOK_URL = st.secrets["DISCORD_WEBHOOK_URL"]
     ADMIN_USER = st.secrets["ADMIN_USER"]
     ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
     
-    # Inicializa cliente Supabase
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception as e:
-    st.error("⚠️ Erro de configuração nos Secrets!")
+    st.error("⚠️ Erro nos Secrets do Streamlit!")
     st.stop()
 
 LOGO_FILE = "logo.png"
@@ -58,7 +54,7 @@ def criar_excel_oficial(df):
         df.to_excel(writer, index=False, sheet_name='Ocorrências', startrow=5)
         workbook, worksheet = writer.book, writer.sheets['Ocorrências']
         fmt_header = workbook.add_format({'bold': True, 'bg_color': '#1F4E78', 'font_color': 'white', 'border': 1})
-        worksheet.write('C2', 'RELATÓRIO OFICIAL DE OCORRÊNCIAS - BVI', workbook.add_format({'bold': True, 'font_size': 14}))
+        worksheet.write('C2', 'RELATÓRIO OFICIAL BVI', workbook.add_format({'bold': True, 'font_size': 14}))
         if os.path.exists(LOGO_FILE):
             worksheet.insert_image('A1', LOGO_FILE, {'x_scale': 0.4, 'y_scale': 0.4})
         for col_num, value in enumerate(df.columns.values):
@@ -70,15 +66,14 @@ def criar_excel_oficial(df):
 st.set_page_config(page_title="BVI - Gestão", page_icon="🚒", layout="wide")
 if os.path.exists(LOGO_FILE): st.sidebar.image(LOGO_FILE, width=150)
 
-st.title("🚒 Sistema BVI (Base de Dados)")
+st.title("🚒 Sistema BVI")
 t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 
 with t1:
     with st.form("f_novo", clear_on_submit=True):
         st.subheader("Registo de Ocorrência:")
-        c1, c2 = st.columns(2)
-        nr = c1.text_input("📕 OCORRÊNCIA Nº")
-        hr = c2.text_input("🕜 HORA")
+        nr = st.text_input("📕 OCORRÊNCIA Nº")
+        hr = st.text_input("🕜 HORA")
         mot = st.text_input("🦺 MOTIVO") 
         sex = st.text_input("👨 SEXO/IDADE") 
         loc = st.text_input("📍 LOCALIDADE")
@@ -103,7 +98,6 @@ with t1:
                 nomes = [mapa[n] for n in ops]
                 data_agora = datetime.now().strftime("%d/%m/%Y %H:%M")
                 
-                # 1. Preparar dados
                 nova_linha = {
                     "numero": nr.upper(), "hora": formatar_hora(hr), "motivo": mot.title(),
                     "sexo": formatar_sexo(sex), "localidade": loc.title(), "morada": mor.title(),
@@ -112,19 +106,19 @@ with t1:
                 }
                 
                 try:
-                    # 2. Gravar no Supabase (Permanente)
                     supabase.table("ocorrencias").insert(nova_linha).execute()
                     
-                    # 3. Enviar para o Discord (Estético)
-                    del nova_linha["data_envio"] # Não enviar data para o Discord como pedido
-                    msg_discord = "\n".join([f"**{k.upper()}** ▶️ {v}" for k, v in nova_linha.items()])
-                    requests.post(DISCORD_WEBHOOK_URL, json={"content": msg_discord})
+                    # Enviar Discord sem a data
+                    dados_discord = nova_linha.copy()
+                    del dados_discord["data_envio"]
+                    msg = "\n".join([f"**{k.upper()}** ▶️ {v}" for k, v in dados_discord.items()])
+                    requests.post(DISCORD_WEBHOOK_URL, json={"content": msg})
                     
-                    st.success("✅ Guardado na Base de Dados e enviado!")
+                    st.success("✅ Guardado com sucesso!")
                 except Exception as e:
                     st.error(f"❌ Erro ao guardar: {e}")
             else:
-                st.error("⚠️ Preencha todos os campos!")
+                st.error("⚠️ Preencha os campos obrigatórios!")
 
 with t2:
     if not st.session_state.get("autenticado", False):
@@ -137,7 +131,6 @@ with t2:
     else:
         st.sidebar.button("Sair", on_click=lambda: st.session_state.update({"autenticado": False}))
         
-        # 4. Ler do Supabase (Mesmo após reboot)
         try:
             res = supabase.table("ocorrencias").select("*").order("data_envio", desc=True).execute()
             if res.data:
@@ -148,12 +141,14 @@ with t2:
                 st.table(df.groupby('Mês').size().reset_index(name='Ocorrências'))
 
                 st.subheader("📋 Histórico Permanente")
+                if 'id' in df.columns: df = df.drop(columns=['id'])
                 st.dataframe(df, width='stretch')
                 
-                st.download_button("📥 Excel Oficial", criar_excel_oficial(df), f"BVI_{datetime.now().year}.xlsx", width='stretch')
+                st.download_button("📥 Excel", criar_excel_oficial(df), f"BVI_{datetime.now().year}.xlsx", width='stretch')
             else:
-                st.info("A base de dados ainda não tem registos.")
+                st.info("Ainda não há dados na base de dados.")
         except Exception as e:
-            st.error(f"Erro ao carregar dados: {e}")
+            st.error(f"❌ Erro ao carregar: {e}")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+
