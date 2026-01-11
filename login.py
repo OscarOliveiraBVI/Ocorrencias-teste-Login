@@ -73,7 +73,7 @@ def criar_excel_oficial(df):
     return output.getvalue()
 
 # --- INICIALIZAÇÃO ---
-st.set_page_config(page_title="BVI - Ocorrências", page_icon="🚒", layout="wide")
+st.set_page_config(page_title="BVI - Ocorrências", page_icon="🚒", layout="centered")
 
 if os.path.exists(LOGO_FILE):
     st.sidebar.image(LOGO_FILE, width=150)
@@ -116,7 +116,7 @@ t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 
 with t1:
     with st.form("f_novo", clear_on_submit=True):
-        st.subheader("Registo de Ocorrência:")
+        st.subheader("Registo de Ocorrências:")
         nr = st.text_input("📕 OCORRÊNCIA Nº")
         hr = st.text_input("🕜 HORA")
         mot = st.text_input("🦺 MOTIVO") 
@@ -185,5 +185,6 @@ with t2:
                 st.success("Atualizado!")
                 st.rerun()
         else: st.info("Histórico vazio.")
+
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
