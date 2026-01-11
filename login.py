@@ -1,39 +1,29 @@
 import streamlit as st
 import requests
 import unicodedata
-import json
-import os
 import pandas as pd
 import io
 from datetime import datetime, timedelta
 
 # --- CONFIGURAÇÃO E SEGREDOS ---
-# Agora os dados sensíveis vêm do st.secrets
 try:
     DISCORD_WEBHOOK_URL = st.secrets["DISCORD_WEBHOOK_URL"]
     ADMIN_USER = st.secrets["ADMIN_USER"]
     ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
+    # Para o GSheets, usamos o pandas para ler o CSV público da folha
+    sheet_id = st.secrets["GSHEETS_URL"].split("/d/")[1].split("/")[0]
+    GSHEETS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
 except:
-    st.error("Erro: Segredos não configurados no Streamlit Cloud!")
+    st.error("⚠️ Secrets em falta no Streamlit Cloud!")
     st.stop()
 
-DB_FILE = "usuarios.json"
-HIST_FILE = "historico.json"
 LOGO_FILE = "logo.png" 
 
-def carregar_dados(ficheiro, default):
-    if not os.path.exists(ficheiro):
-        salvar_dados(ficheiro, default)
-        return default
+def carregar_dados_nuvem():
     try:
-        with open(ficheiro, "r", encoding="utf-8") as f:
-            return json.load(f)
+        return pd.read_csv(GSHEETS_CSV_URL)
     except:
-        return default
-
-def salvar_dados(ficheiro, dados):
-    with open(ficheiro, "w", encoding="utf-8") as f:
-        json.dump(dados, f, indent=4, ensure_ascii=False)
+        return pd.DataFrame()
 
 def limpar_texto(txt):
     return ''.join(c for c in unicodedata.normalize('NFD', txt) 
@@ -73,7 +63,7 @@ def criar_excel_oficial(df):
     return output.getvalue()
 
 # --- INICIALIZAÇÃO ---
-st.set_page_config(page_title="BVI - Ocorrências", page_icon="🚒", layout="centered")
+st.set_page_config(page_title="BVI - Ocorrências Ativas", page_icon="🚒", layout="centered")
 
 if os.path.exists(LOGO_FILE):
     st.sidebar.image(LOGO_FILE, width=150)
@@ -81,9 +71,7 @@ if os.path.exists(LOGO_FILE):
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
 if "login_time" not in st.session_state: st.session_state.login_time = None
 
-historico_db = carregar_dados(HIST_FILE, [])
-
-# --- CONTROLO SESSÃO 1H ---
+# --- SESSÃO 1H ---
 if st.session_state.autenticado and st.session_state.login_time:
     if datetime.now() - st.session_state.login_time > timedelta(hours=1):
         st.warning("⚠️ Sessão expirada!")
@@ -127,7 +115,7 @@ with t1:
         ops = st.multiselect("👨🏻‍🚒 OPERACIONAIS", options=lista_sem_acentos)
         out = st.text_input("🚨 OUTROS MEIOS", value="Nenhum")
         
-        if st.form_submit_button("SUBMETER", use_container_width=True):
+        if st.form_submit_button("SUBMETER", width='stretch'):
             if not (nr and hr and mot and loc and mor and meios and ops):
                 st.error("⚠️ Preencha todos os campos obrigatórios!")
             else:
@@ -139,15 +127,10 @@ with t1:
                     "🚒 MEIOS": ", ".join(meios), "👨🏻‍🚒 OPERACIONAIS": ", ".join(nomes),
                     "🚨 OUTROS MEIOS": out.title()
                 }
-                dados_h = dados_d.copy()
-                dados_h["📅 DATA DO ENVIO"] = datetime.now().strftime("%d/%m/%Y %H:%M")
                 msg = "\n".join([f"**{k}** ▶️ {v}" for k, v in dados_d.items()])
                 try:
                     if requests.post(DISCORD_WEBHOOK_URL, json={"content": msg}).status_code == 204:
-                        atual = carregar_dados(HIST_FILE, [])
-                        atual.insert(0, dados_h)
-                        salvar_dados(HIST_FILE, atual)
-                        st.success("✅ Enviado!")
+                        st.success("✅ Enviado! (Dados guardados no Discord)")
                     else: st.error("❌ Erro no Discord.")
                 except: st.error("❌ Erro de ligação.")
 
@@ -163,28 +146,17 @@ with t2:
             else: st.error("Credenciais inválidas.")
     else:
         st.sidebar.button("Sair", on_click=lambda: st.session_state.update({"autenticado": False}))
-        hist = carregar_dados(HIST_FILE, [])
-        if hist:
-            df = pd.DataFrame(hist)
-            df_t = df.copy()
-            df_t['📅 DATA DO ENVIO'] = pd.to_datetime(df_t['📅 DATA DO ENVIO'], dayfirst=True)
-            df_t['Mes_Ano'] = df_t['📅 DATA DO ENVIO'].dt.strftime('%m/%Y')
-            st.subheader("📊 Totais por Mês")
-            st.table(df_t.groupby('Mes_Ano').size().reset_index(name='Total'))
-
+        df = carregar_dados_nuvem()
+        if not df.empty:
+            st.subheader("📊 Resumo do Histórico")
+            st.dataframe(df, width='stretch')
+            
             excel = criar_excel_oficial(df)
             st.download_button(label="📥 Descarregar Excel Oficial", data=excel, 
                                file_name=f"BVI_{datetime.now().strftime('%Y%m%d')}.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                               use_container_width=True)
-
-            st.subheader("🔍 Gestão e Edição")
-            df_ed = st.data_editor(df, use_container_width=True, num_rows="dynamic")
-            if st.button("Guardar Alterações"):
-                salvar_dados(HIST_FILE, df_ed.to_dict('records'))
-                st.success("Atualizado!")
-                st.rerun()
-        else: st.info("Histórico vazio.")
-
+                               width='stretch')
+        else:
+            st.info("Ligue a folha de Google Sheets para ver o histórico.")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
