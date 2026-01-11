@@ -7,8 +7,6 @@ import os
 from datetime import datetime
 
 # --- CONFIGURAÇÃO E SEGREDOS ---
-# NOTA: Para não perderes dados, vamos usar o segredo do Streamlit como "base de dados" temporária
-# ou, idealmente, deves configurar o Google Sheets com uma Service Account.
 try:
     DISCORD_WEBHOOK_URL = st.secrets["DISCORD_WEBHOOK_URL"]
     ADMIN_USER = st.secrets["ADMIN_USER"]
@@ -19,8 +17,7 @@ except:
 
 LOGO_FILE = "logo.png"
 
-# Para evitar perda total em reboots, usamos o cache do Streamlit para manter os dados vivos
-# Mas atenção: se o servidor "dormir", o cache limpa. 
+# Manter dados na sessão (vulnerável a reboot, mas limpo no Discord)
 if "db_ocorrencias" not in st.session_state:
     st.session_state.db_ocorrencias = []
 
@@ -65,7 +62,7 @@ def criar_excel_oficial(df):
     return output.getvalue()
 
 # --- INTERFACE ---
-st.set_page_config(page_title="BVI - Gestão", page_icon="🚒", layout="centered")
+st.set_page_config(page_title="BVI - Ocorrências", page_icon="🚒", layout="centered")
 if os.path.exists(LOGO_FILE): st.sidebar.image(LOGO_FILE, width=150)
 
 st.title("🚒 Ocorrências Ativas")
@@ -73,7 +70,7 @@ t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 
 with t1:
     with st.form("f_novo", clear_on_submit=True):
-        st.subheader("Registo de Ocorrências:")
+        st.subheader("Registo de Ocorrência:")
         nr = st.text_input("📕 OCORRÊNCIA Nº")
         hr = st.text_input("🕜 HORA")
         mot = st.text_input("🦺 MOTIVO") 
@@ -99,20 +96,31 @@ with t1:
             if nr and hr and mot and loc and mor and meios and ops:
                 nomes = [mapa[n] for n in ops]
                 data_agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+                
                 nova_linha = {
-                    "📕 OCORRÊNCIA Nº": nr.upper(), "🕜 HORA": formatar_hora(hr), "🦺 MOTIVO": mot.title(),
-                    "👨 SEXO/IDADE": formatar_sexo(sex), "📍 LOCALIDADE": loc.title(), "🏠 MORADA": mor.title(),
-                    "🚒 MEIOS": ", ".join(meios), "👨🏻‍🚒 OPERACIONAIS": ", ".join(nomes),
-                    "🚨 OUTROS MEIOS": out.title(), "📅 DATA DO ENVIO": data_agora
+                    "📕 OCORRÊNCIA Nº": nr.upper(), 
+                    "🕜 HORA": formatar_hora(hr), 
+                    "🦺 MOTIVO": mot.title(),
+                    "👨 SEXO/IDADE": formatar_sexo(sex), 
+                    "📍 LOCALIDADE": loc.title(), 
+                    "🏠 MORADA": mor.title(),
+                    "🚒 MEIOS": ", ".join(meios), 
+                    "👨🏻‍🚒 OPERACIONAIS": ", ".join(nomes),
+                    "🚨 OUTROS MEIOS": out.title(), 
+                    "📅 DATA DO ENVIO": data_agora
                 }
                 
-                # Guardar na sessão (perde se houver reboot, mas é rápido)
                 st.session_state.db_ocorrencias.append(nova_linha)
                 
-                # Enviar para o Discord (Aqui os dados ficam salvos para sempre!)
-                msg = "\n".join([f"**{k}**: {v}" for k, v in nova_linha.items()])
-                requests.post(DISCORD_WEBHOOK_URL, json={"content": msg})
-                st.success("✅ Enviado! Os dados estão seguros no Discord.")
+                
+                dados_discord = nova_linha.copy()
+                del dados_discord["📅 DATA DO ENVIO"]
+
+                msg_discord = "\n".join([f"**{k}** ▶️ {v}" for k, v in dados_discord.items()])
+
+                
+                requests.post(DISCORD_WEBHOOK_URL, json={"content": msg_discord})
+                st.success("✅ Enviado com sucesso!")
             else:
                 st.error("⚠️ Preencha todos os campos!")
 
@@ -141,7 +149,10 @@ with t2:
             
             st.download_button("📥 Descarregar Excel Oficial", criar_excel_oficial(df), f"BVI_{datetime.now().year}.xlsx", width='stretch')
         else:
-            st.info("O histórico local está vazio. Consulte o canal do Discord para ver registos antigos.")
+            st.info("Histórico local vazio.")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+
+st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+
 
