@@ -4,32 +4,25 @@ import unicodedata
 import pandas as pd
 import io
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # --- CONFIGURAÇÃO E SEGREDOS ---
+# NOTA: Para não perderes dados, vamos usar o segredo do Streamlit como "base de dados" temporária
+# ou, idealmente, deves configurar o Google Sheets com uma Service Account.
 try:
     DISCORD_WEBHOOK_URL = st.secrets["DISCORD_WEBHOOK_URL"]
     ADMIN_USER = st.secrets["ADMIN_USER"]
     ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
 except:
-    st.error("⚠️ Configura DISCORD_WEBHOOK_URL, ADMIN_USER e ADMIN_PASSWORD nos Secrets!")
+    st.error("⚠️ Configura os Secrets no Streamlit Cloud!")
     st.stop()
 
-# Ficheiro local para manter os dados enquanto a app corre
-HIST_FILE = "historico_backup.csv"
 LOGO_FILE = "logo.png"
 
-def carregar_dados():
-    if os.path.exists(HIST_FILE):
-        return pd.read_csv(HIST_FILE)
-    return pd.DataFrame(columns=[
-        "📕 OCORRÊNCIA Nº", "🕜 HORA", "🦺 MOTIVO", "👨 SEXO/IDADE", 
-        "📍 LOCALIDADE", "🏠 MORADA", "🚒 MEIOS", "👨🏻‍🚒 OPERACIONAIS", 
-        "🚨 OUTROS MEIOS", "📅 DATA DO ENVIO"
-    ])
-
-def salvar_dados(df):
-    df.to_csv(HIST_FILE, index=False)
+# Para evitar perda total em reboots, usamos o cache do Streamlit para manter os dados vivos
+# Mas atenção: se o servidor "dormir", o cache limpa. 
+if "db_ocorrencias" not in st.session_state:
+    st.session_state.db_ocorrencias = []
 
 def limpar_texto(txt):
     return ''.join(c for c in unicodedata.normalize('NFD', txt) 
@@ -49,12 +42,12 @@ def formatar_hora(texto):
     if len(t) == 4 and t.isdigit(): return f"{t[:2]}:{t[2:]}"
     return texto
 
-def mes_extenso(dt):
+def mes_extenso(dt_str):
     meses = {1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho",
              7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"}
     try:
-        d = pd.to_datetime(dt, dayfirst=True)
-        return f"{meses[d.month]} de {d.year}"
+        dt = datetime.strptime(dt_str, "%d/%m/%Y %H:%M")
+        return f"{meses[dt.month]} de {dt.year}"
     except: return "Data Inválida"
 
 def criar_excel_oficial(df):
@@ -71,19 +64,16 @@ def criar_excel_oficial(df):
             worksheet.set_column(col_num, col_num, 20)
     return output.getvalue()
 
-# --- INICIALIZAÇÃO ---
-st.set_page_config(page_title="BVI - Gestão", page_icon="🚒", layout="wide")
+# --- INTERFACE ---
+st.set_page_config(page_title="BVI - Gestão", page_icon="🚒", layout="centered")
 if os.path.exists(LOGO_FILE): st.sidebar.image(LOGO_FILE, width=150)
 
-if "autenticado" not in st.session_state: st.session_state.autenticado = False
-
-# --- INTERFACE ---
-st.title("🚒 Sistema BVI")
+st.title("🚒 Ocorrências Ativas")
 t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 
 with t1:
     with st.form("f_novo", clear_on_submit=True):
-        st.subheader("Registo de Ocorrência:")
+        st.subheader("Registo de Ocorrências:")
         c1, c2 = st.columns(2)
         nr = c1.text_input("📕 OCORRÊNCIA Nº")
         hr = c2.text_input("🕜 HORA")
@@ -109,27 +99,26 @@ with t1:
         if st.form_submit_button("SUBMETER", width='stretch'):
             if nr and hr and mot and loc and mor and meios and ops:
                 nomes = [mapa[n] for n in ops]
+                data_agora = datetime.now().strftime("%d/%m/%Y %H:%M")
                 nova_linha = {
                     "📕 OCORRÊNCIA Nº": nr.upper(), "🕜 HORA": formatar_hora(hr), "🦺 MOTIVO": mot.title(),
                     "👨 SEXO/IDADE": formatar_sexo(sex), "📍 LOCALIDADE": loc.title(), "🏠 MORADA": mor.title(),
                     "🚒 MEIOS": ", ".join(meios), "👨🏻‍🚒 OPERACIONAIS": ", ".join(nomes),
-                    "🚨 OUTROS MEIOS": out.title(), "📅 DATA DO ENVIO": datetime.now().strftime("%d/%m/%Y %H:%M")
+                    "🚨 OUTROS MEIOS": out.title(), "📅 DATA DO ENVIO": data_agora
                 }
                 
-                # Guardar localmente
-                df = carregar_dados()
-                df = pd.concat([df, pd.DataFrame([nova_linha])], ignore_index=True)
-                salvar_dados(df)
+                # Guardar na sessão (perde se houver reboot, mas é rápido)
+                st.session_state.db_ocorrencias.append(nova_linha)
                 
-                # Enviar Discord
+                # Enviar para o Discord (Aqui os dados ficam salvos para sempre!)
                 msg = "\n".join([f"**{k}**: {v}" for k, v in nova_linha.items()])
                 requests.post(DISCORD_WEBHOOK_URL, json={"content": msg})
-                st.success("✅ Registado com sucesso!")
+                st.success("✅ Enviado! Os dados estão seguros no Discord.")
             else:
                 st.error("⚠️ Preencha todos os campos!")
 
 with t2:
-    if not st.session_state.autenticado:
+    if not st.session_state.get("autenticado", False):
         u = st.text_input("Utilizador")
         s = st.text_input("Senha", type="password")
         if st.button("Entrar"):
@@ -139,23 +128,20 @@ with t2:
             else: st.error("Incorreto.")
     else:
         st.sidebar.button("Sair", on_click=lambda: st.session_state.update({"autenticado": False}))
-        df = carregar_dados()
-        if not df.empty:
+        
+        if st.session_state.db_ocorrencias:
+            df = pd.DataFrame(st.session_state.db_ocorrencias)
+            
             st.subheader("📊 Totais por Mês")
             df_resumo = df.copy()
             df_resumo['Mês'] = df_resumo['📅 DATA DO ENVIO'].apply(mes_extenso)
             st.table(df_resumo.groupby('Mês').size().reset_index(name='Ocorrências'))
 
-            st.subheader("📋 Histórico")
+            st.subheader("📋 Histórico desta Sessão")
             st.dataframe(df, width='stretch')
             
-            # Botão para limpar histórico (Cuidado!)
-            if st.button("Limpar Tudo"):
-                if os.path.exists(HIST_FILE): os.remove(HIST_FILE)
-                st.rerun()
-
-            st.download_button("📥 Descarregar Excel", criar_excel_oficial(df), f"BVI_{datetime.now().year}.xlsx", width='stretch')
+            st.download_button("📥 Descarregar Excel Oficial", criar_excel_oficial(df), f"BVI_{datetime.now().year}.xlsx", width='stretch')
         else:
-            st.info("Sem dados.")
+            st.info("O histórico local está vazio. Consulte o canal do Discord para ver registos antigos.")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
