@@ -63,7 +63,7 @@ def criar_excel_oficial(df):
     return output.getvalue()
 
 # --- INTERFACE ---
-st.set_page_config(page_title="BVI - Ocorrências ", page_icon="🚒", layout="wide")
+st.set_page_config(page_title="BVI - Ocorrências ", page_icon="logo.png", layout="centered")
 if os.path.exists(LOGO_FILE): st.sidebar.image(LOGO_FILE, width=150)
 
 st.title("🚒 Ocorrências Ativas")
@@ -161,4 +161,5 @@ with t2:
             st.error(f"❌ Erro: {e}")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+
 
