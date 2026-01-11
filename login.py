@@ -5,9 +5,12 @@ import pandas as pd
 import io
 import os
 from datetime import datetime
+from supabase import create_client, Client
 
 # --- CONFIGURAÇÃO E SEGREDOS ---
 try:
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
     DISCORD_WEBHOOK_URL = st.secrets["DISCORD_WEBHOOK_URL"]
     ADMIN_USER = st.secrets["ADMIN_USER"]
     ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
@@ -152,6 +155,7 @@ with t2:
             st.info("Histórico local vazio.")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+
 
 
 
