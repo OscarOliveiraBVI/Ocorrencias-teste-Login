@@ -7,7 +7,6 @@ import os
 from datetime import datetime
 from supabase import create_client, Client
 
-# --- CONFIGURAÇÃO E SEGREDOS ---
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
@@ -64,22 +63,21 @@ def criar_excel_oficial(df):
             worksheet.set_column(col_num, col_num, 22)
     return output.getvalue()
 
-# --- INTERFACE ---
-st.set_page_config(page_title="BVI - Gestão", page_icon="🚒", layout="wide")
+
+st.set_page_config(page_title="BVI - Ocorrências", page_icon="logo.png", layout="centered"))
 
 if st.session_state.get("autenticado", False):
     st.sidebar.markdown(f"👤 **Utilizador:** {ADMIN_USER}")
     st.sidebar.button("Sair", on_click=lambda: st.session_state.update({"autenticado": False}))
 
-st.title("🚒 Sistema BVI")
+st.title("🚒  Ocorrências Ativas")
 t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 
 with t1:
     with st.form("f_novo", clear_on_submit=True):
         st.subheader("Nova Ocorrência:")
-        c1, c2 = st.columns(2)
-        nr = c1.text_input("📕 OCORRÊNCIA Nº")
-        hr = c2.text_input("🕜 HORA")
+        nr = st.text_input("📕 OCORRÊNCIA Nº")
+        hr = st.text_input("🕜 HORA")
         mot = st.text_input("🦺 MOTIVO") 
         sex = st.text_input("👨 SEXO/IDADE") 
         loc = st.text_input("📍 LOCALIDADE")
@@ -162,11 +160,12 @@ with t2:
                 st.subheader("📋 Histórico")
                 if 'id' in df_v.columns: df_v = df_v.drop(columns=['id'])
                 st.dataframe(df_v, use_container_width=True)
-                st.download_button("📥 Excel Oficial", criar_excel_oficial(df_v), f"BVI_{datetime.now().year}.xlsx")
+                st.download_button("📥 Excel Oficial", criar_excel_oficial(df_v), f"Relatorio_BVI_{datetime.now().year}.xlsx")
             else:
                 st.info("Vazio.")
         except Exception as e:
             st.error(f"❌ Erro: {e}")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+
 
