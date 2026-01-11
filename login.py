@@ -74,9 +74,8 @@ t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 with t1:
     with st.form("f_novo", clear_on_submit=True):
         st.subheader("Registo de Ocorrências:")
-        c1, c2 = st.columns(2)
-        nr = c1.text_input("📕 OCORRÊNCIA Nº")
-        hr = c2.text_input("🕜 HORA")
+        nr = st.text_input("📕 OCORRÊNCIA Nº")
+        hr = st.text_input("🕜 HORA")
         mot = st.text_input("🦺 MOTIVO") 
         sex = st.text_input("👨 SEXO/IDADE") 
         loc = st.text_input("📍 LOCALIDADE")
@@ -145,3 +144,4 @@ with t2:
             st.info("O histórico local está vazio. Consulte o canal do Discord para ver registos antigos.")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+
