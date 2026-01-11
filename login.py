@@ -92,7 +92,7 @@ with t1:
                 nomes = [mapa[n] for n in ops]
                 data_agora = datetime.now().strftime("%d/%m/%Y %H:%M")
                 
-                # Dados completos para o Supabase
+                # Dados para o Supabase
                 nova_linha = {
                     "numero": nr.upper(), "hora": formatar_hora(hr), "motivo": mot.title(),
                     "sexo": formatar_sexo(sex), "localidade": loc.title(), "morada": mor.title(),
@@ -104,37 +104,33 @@ with t1:
                     # Grava na base de dados
                     supabase.table("ocorrencias").insert(nova_linha).execute()
                     
-                    # --- ELIMINA A DATA PARA O ENVIO DO DISCORD ---
+                    # Prepara cópia para o Discord SEM a data de envio
                     dados_discord = nova_linha.copy()
-                    if "data_envio" in dados_discord:
-                        del dados_discord["data_envio"]
+                    del dados_discord["data_envio"]
                     
-                    # Formata a mensagem com os nomes visuais para o Discord
-                    mapa_visual = {
+                    mapa_discord = {
                         "numero": "📕 OCORRÊNCIA Nº", "hora": "🕜 HORA", "motivo": "🦺 MOTIVO",
                         "sexo": "👨 SEXO/IDADE", "localidade": "📍 LOCALIDADE", "morada": "🏠 MORADA",
                         "meios": "🚒 MEIOS", "operacionais": "👨🏻‍🚒 OPERACIONAIS", "outros": "🚨 OUTROS MEIOS"
                     }
                     
-                    msg = "\n".join([f"**{mapa_visual[k]}** ▶️ {v}" for k, v in dados_discord.items()])
-                    
+                    msg = "\n".join([f"**{mapa_discord[k]}** ▶️ {v}" for k, v in dados_discord.items()])
                     requests.post(DISCORD_WEBHOOK_URL, json={"content": msg})
-                    st.success("✅ Ocorrência guardada e enviada!")
+                    
+                    st.success("✅ Sucesso!")
                 except Exception as e:
                     st.error(f"❌ Erro ao guardar: {e}")
             else:
-                st.error("⚠️ Preencha todos os campos!")
+                st.error("⚠️ Preencha tudo!")
 
 with t2:
     if not st.session_state.get("autenticado", False):
-        u = st.text_input("Utilizador", key="login_u")
-        s = st.text_input("Senha", type="password", key="login_s")
+        u = st.text_input("Utilizador", key="u_login")
+        s = st.text_input("Senha", type="password", key="s_login")
         if st.button("Entrar"):
             if u == ADMIN_USER and s == ADMIN_PASSWORD:
                 st.session_state.autenticado = True
                 st.rerun()
-            else:
-                st.error("Incorreto.")
     else:
         st.sidebar.button("Sair", on_click=lambda: st.session_state.update({"autenticado": False}))
         
@@ -149,22 +145,20 @@ with t2:
                     "meios": "🚒 MEIOS", "operacionais": "👨🏻‍🚒 OPERACIONAIS", 
                     "outros": "🚨 OUTROS MEIOS", "data_envio": "📅 DATA DO ENVIO"
                 }
-                df_visual = df.rename(columns=mapa_colunas)
+                df_v = df.rename(columns=mapa_colunas)
 
-                st.subheader("📊 Totais por Mês")
-                df_visual['Mês'] = df_visual['📅 DATA DO ENVIO'].apply(mes_extenso)
-                st.table(df_visual.groupby('Mês').size().reset_index(name='Total'))
+                st.subheader("📊 Totais")
+                df_v['Mês'] = df_v['📅 DATA DO ENVIO'].apply(mes_extenso)
+                st.table(df_v.groupby('Mês').size().reset_index(name='Total'))
 
                 st.subheader("📋 Histórico")
-                if 'id' in df_visual.columns: 
-                    df_visual = df_visual.drop(columns=['id'])
-                st.dataframe(df_visual, use_container_width=True)
+                if 'id' in df_v.columns: df_v = df_v.drop(columns=['id'])
+                st.dataframe(df_v, use_container_width=True)
                 
-                st.download_button("📥 Excel Oficial", criar_excel_oficial(df_visual), f"BVI_{datetime.now().year}.xlsx")
+                st.download_button("📥 Excel", criar_excel_oficial(df_v), f"BVI_{datetime.now().year}.xlsx")
             else:
-                st.info("A base de dados está vazia.")
+                st.info("Vazio.")
         except Exception as e:
-            st.error(f"❌ Erro ao carregar dados: {e}")
+            st.error(f"❌ Erro: {e}")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
-
