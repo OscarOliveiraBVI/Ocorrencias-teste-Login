@@ -3,6 +3,7 @@ import requests
 import unicodedata
 import pandas as pd
 import io
+import os
 from datetime import datetime, timedelta
 
 # --- CONFIGURAÇÃO E SEGREDOS ---
@@ -160,3 +161,4 @@ with t2:
             st.info("Ligue a folha de Google Sheets para ver o histórico.")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+
