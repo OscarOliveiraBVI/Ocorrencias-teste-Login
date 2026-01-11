@@ -151,8 +151,9 @@ with t2:
         else:
             st.info("Histórico local vazio.")
 
-st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year}, unsafe_allow_html=True)
 
-st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;"> © BVI</div>', unsafe_allow_html=True)
+
 
 
