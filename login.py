@@ -7,6 +7,7 @@ import os
 from datetime import datetime
 from supabase import create_client, Client
 
+# --- CONFIGURAÇÃO E SEGREDOS ---
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
@@ -63,21 +64,22 @@ def criar_excel_oficial(df):
             worksheet.set_column(col_num, col_num, 22)
     return output.getvalue()
 
-
-st.set_page_config(page_title="BVI - Ocorrências", page_icon="logo.png", layout="centered")
+# --- INTERFACE ---
+st.set_page_config(page_title="BVI - Gestão", page_icon="🚒", layout="wide")
 
 if st.session_state.get("autenticado", False):
     st.sidebar.markdown(f"👤 **Utilizador:** {ADMIN_USER}")
     st.sidebar.button("Sair", on_click=lambda: st.session_state.update({"autenticado": False}))
 
-st.title("🚒  Ocorrências Ativas")
+st.title("🚒 Sistema BVI")
 t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 
 with t1:
     with st.form("f_novo", clear_on_submit=True):
         st.subheader("Nova Ocorrência:")
-        nr = st.text_input("📕 OCORRÊNCIA Nº")
-        hr = st.text_input("🕜 HORA")
+        c1, c2 = st.columns(2)
+        nr = c1.text_input("📕 OCORRÊNCIA Nº")
+        hr = c2.text_input("🕜 HORA")
         mot = st.text_input("🦺 MOTIVO") 
         sex = st.text_input("👨 SEXO/IDADE") 
         loc = st.text_input("📍 LOCALIDADE")
@@ -95,7 +97,8 @@ with t1:
                 nomes = [mapa[n] for n in ops]
                 data_agora = datetime.now().strftime("%d/%m/%Y %H:%M")
                 
-                # Extrai apenas os números da ocorrência
+                # Verifica se o utilizador escreveu "CODU" no campo
+                e_codu = "CODU" in nr.upper()
                 numero_limpo = apenas_numeros(nr)
                 
                 nova_linha = {
@@ -117,16 +120,25 @@ with t1:
                     dados_discord = nova_linha.copy()
                     del dados_discord["data_envio"]
                     
+                    # Se for CODU, altera o nome do campo apenas no Discord
+                    nome_campo_nr = "📕 CODU Nº" if e_codu else "📕 OCORRÊNCIA Nº"
+                    
                     mapa_discord = {
-                        "numero": "📕 OCORRÊNCIA Nº", "hora": "🕜 HORA", "motivo": "🦺 MOTIVO",
-                        "sexo": "👨 SEXO/IDADE", "localidade": "📍 LOCALIDADE", "morada": "🏠 MORADA",
-                        "meios": "🚒 MEIOS", "operacionais": "👨🏻‍🚒 OPERACIONAIS", "outros": "🚨 OUTROS MEIOS"
+                        "numero": nome_campo_nr, 
+                        "hora": "🕜 HORA", 
+                        "motivo": "🦺 MOTIVO",
+                        "sexo": "👨 SEXO/IDADE", 
+                        "localidade": "📍 LOCALIDADE", 
+                        "morada": "🏠 MORADA",
+                        "meios": "🚒 MEIOS", 
+                        "operacionais": "👨🏻‍🚒 OPERACIONAIS", 
+                        "outros": "🚨 OUTROS MEIOS"
                     }
                     
                     msg = "\n".join([f"**{mapa_discord[k]}** ▶️ {v}" for k, v in dados_discord.items()])
                     requests.post(DISCORD_WEBHOOK_URL, json={"content": msg})
                     
-                    st.success(f"✅ Ocorrência {numero_limpo} guardada!")
+                    st.success(f"✅ {nome_campo_nr.replace('📕 ', '')} {numero_limpo} guardado!")
                 except Exception as e:
                     st.error(f"❌ Erro ao guardar: {e}")
             else:
@@ -140,8 +152,6 @@ with t2:
             if u == ADMIN_USER and s == ADMIN_PASSWORD:
                 st.session_state.autenticado = True
                 st.rerun()
-            else:
-                st.error("Incorreto.")
     else:
         try:
             res = supabase.table("ocorrencias").select("*").order("data_envio", desc=True).execute()
@@ -160,13 +170,10 @@ with t2:
                 st.subheader("📋 Histórico")
                 if 'id' in df_v.columns: df_v = df_v.drop(columns=['id'])
                 st.dataframe(df_v, use_container_width=True)
-                st.download_button("📥 Excel Oficial", criar_excel_oficial(df_v), f"Relatorio_BVI_{datetime.now().year}.xlsx")
+                st.download_button("📥 Excel Oficial", criar_excel_oficial(df_v), f"BVI_{datetime.now().year}.xlsx")
             else:
                 st.info("Vazio.")
         except Exception as e:
             st.error(f"❌ Erro: {e}")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
-
-
-
