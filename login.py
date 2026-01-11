@@ -63,18 +63,17 @@ def criar_excel_oficial(df):
     return output.getvalue()
 
 # --- INTERFACE ---
-st.set_page_config(page_title="BVI - Gestão", page_icon="🚒", layout="wide")
+st.set_page_config(page_title="BVI - Ocorrência", page_icon="🚒", layout="centered")
 if os.path.exists(LOGO_FILE): st.sidebar.image(LOGO_FILE, width=150)
 
-st.title("🚒 Sistema BVI")
+st.title("🚒 Ocorrências Ativas")
 t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 
 with t1:
     with st.form("f_novo", clear_on_submit=True):
-        st.subheader("Nova Ocorrência:")
-        c1, c2 = st.columns(2)
-        nr = c1.text_input("📕 OCORRÊNCIA Nº")
-        hr = c2.text_input("🕜 HORA")
+        st.subheader("Nova Ocorrências:")
+        nr = st.text_input("📕 OCORRÊNCIA Nº")
+        hr = st.text_input("🕜 HORA")
         mot = st.text_input("🦺 MOTIVO") 
         sex = st.text_input("👨 SEXO/IDADE") 
         loc = st.text_input("📍 LOCALIDADE")
@@ -92,6 +91,7 @@ with t1:
                 nomes = [mapa[n] for n in ops]
                 data_agora = datetime.now().strftime("%d/%m/%Y %H:%M")
                 
+                # Dados completos para o Supabase
                 nova_linha = {
                     "numero": nr.upper(), "hora": formatar_hora(hr), "motivo": mot.title(),
                     "sexo": formatar_sexo(sex), "localidade": loc.title(), "morada": mor.title(),
@@ -100,10 +100,25 @@ with t1:
                 }
                 
                 try:
+                    # Grava na base de dados
                     supabase.table("ocorrencias").insert(nova_linha).execute()
-                    msg = f"🔥 **Nova Ocorrência {nr.upper()}**\n🕜 {hr}\n🦺 {mot.title()}\n📍 {loc.title()}\n🚒 {', '.join(meios)}"
+                    
+                    # --- ELIMINA A DATA PARA O ENVIO DO DISCORD ---
+                    dados_discord = nova_linha.copy()
+                    if "data_envio" in dados_discord:
+                        del dados_discord["data_envio"]
+                    
+                    # Formata a mensagem com os nomes visuais para o Discord
+                    mapa_visual = {
+                        "numero": "📕 OCORRÊNCIA Nº", "hora": "🕜 HORA", "motivo": "🦺 MOTIVO",
+                        "sexo": "👨 SEXO/IDADE", "localidade": "📍 LOCALIDADE", "morada": "🏠 MORADA",
+                        "meios": "🚒 MEIOS", "operacionais": "👨🏻‍🚒 OPERACIONAIS", "outros": "🚨 OUTROS MEIOS"
+                    }
+                    
+                    msg = "\n".join([f"**{mapa_visual[k]}** ▶️ {v}" for k, v in dados_discord.items()])
+                    
                     requests.post(DISCORD_WEBHOOK_URL, json={"content": msg})
-                    st.success("✅ Ocorrência guardada!")
+                    st.success("✅ Ocorrência guardada e enviada!")
                 except Exception as e:
                     st.error(f"❌ Erro ao guardar: {e}")
             else:
@@ -111,8 +126,8 @@ with t1:
 
 with t2:
     if not st.session_state.get("autenticado", False):
-        u = st.text_input("Utilizador", key="user_input")
-        s = st.text_input("Senha", type="password", key="pass_input")
+        u = st.text_input("Utilizador", key="login_u")
+        s = st.text_input("Senha", type="password", key="login_s")
         if st.button("Entrar"):
             if u == ADMIN_USER and s == ADMIN_PASSWORD:
                 st.session_state.autenticado = True
@@ -127,18 +142,11 @@ with t2:
             if res.data:
                 df = pd.DataFrame(res.data)
                 
-                # Tradução das colunas da Base de Dados para o utilizador
                 mapa_colunas = {
-                    "numero": "📕 OCORRÊNCIA Nº", 
-                    "hora": "🕜 HORA", 
-                    "motivo": "🦺 MOTIVO",
-                    "sexo": "👨 SEXO/IDADE", 
-                    "localidade": "📍 LOCALIDADE", 
-                    "morada": "🏠 MORADA",
-                    "meios": "🚒 MEIOS", 
-                    "operacionais": "👨🏻‍🚒 OPERACIONAIS", 
-                    "outros": "🚨 OUTROS MEIOS", 
-                    "data_envio": "📅 DATA DO ENVIO"
+                    "numero": "📕 OCORRÊNCIA Nº", "hora": "🕜 HORA", "motivo": "🦺 MOTIVO",
+                    "sexo": "👨 SEXO/IDADE", "localidade": "📍 LOCALIDADE", "morada": "🏠 MORADA",
+                    "meios": "🚒 MEIOS", "operacionais": "👨🏻‍🚒 OPERACIONAIS", 
+                    "outros": "🚨 OUTROS MEIOS", "data_envio": "📅 DATA DO ENVIO"
                 }
                 df_visual = df.rename(columns=mapa_colunas)
 
@@ -149,7 +157,6 @@ with t2:
                 st.subheader("📋 Histórico")
                 if 'id' in df_visual.columns: 
                     df_visual = df_visual.drop(columns=['id'])
-                
                 st.dataframe(df_visual, use_container_width=True)
                 
                 st.download_button("📥 Excel Oficial", criar_excel_oficial(df_visual), f"BVI_{datetime.now().year}.xlsx")
@@ -159,3 +166,4 @@ with t2:
             st.error(f"❌ Erro ao carregar dados: {e}")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+
