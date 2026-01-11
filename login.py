@@ -9,20 +9,22 @@ from supabase import create_client, Client
 
 # --- CONFIGURAÇÃO E SEGREDOS ---
 try:
+    # Supabase (Base de Dados Real)
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    
+    # Discord e Acesso
     DISCORD_WEBHOOK_URL = st.secrets["DISCORD_WEBHOOK_URL"]
     ADMIN_USER = st.secrets["ADMIN_USER"]
     ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
-except:
-    st.error("⚠️ Configura os Secrets no Streamlit Cloud!")
+    
+    # Inicializa cliente Supabase
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    st.error("⚠️ Erro de configuração nos Secrets!")
     st.stop()
 
 LOGO_FILE = "logo.png"
-
-# Manter dados na sessão (vulnerável a reboot, mas limpo no Discord)
-if "db_ocorrencias" not in st.session_state:
-    st.session_state.db_ocorrencias = []
 
 def limpar_texto(txt):
     return ''.join(c for c in unicodedata.normalize('NFD', txt) 
@@ -65,17 +67,18 @@ def criar_excel_oficial(df):
     return output.getvalue()
 
 # --- INTERFACE ---
-st.set_page_config(page_title="BVI - Ocorrências", page_icon="🚒", layout="centered")
+st.set_page_config(page_title="BVI - Gestão", page_icon="🚒", layout="wide")
 if os.path.exists(LOGO_FILE): st.sidebar.image(LOGO_FILE, width=150)
 
-st.title("🚒 Ocorrências Ativas")
+st.title("🚒 Sistema BVI (Base de Dados)")
 t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 
 with t1:
     with st.form("f_novo", clear_on_submit=True):
         st.subheader("Registo de Ocorrência:")
-        nr = st.text_input("📕 OCORRÊNCIA Nº")
-        hr = st.text_input("🕜 HORA")
+        c1, c2 = st.columns(2)
+        nr = c1.text_input("📕 OCORRÊNCIA Nº")
+        hr = c2.text_input("🕜 HORA")
         mot = st.text_input("🦺 MOTIVO") 
         sex = st.text_input("👨 SEXO/IDADE") 
         loc = st.text_input("📍 LOCALIDADE")
@@ -100,30 +103,26 @@ with t1:
                 nomes = [mapa[n] for n in ops]
                 data_agora = datetime.now().strftime("%d/%m/%Y %H:%M")
                 
+                # 1. Preparar dados
                 nova_linha = {
-                    "📕 OCORRÊNCIA Nº": nr.upper(), 
-                    "🕜 HORA": formatar_hora(hr), 
-                    "🦺 MOTIVO": mot.title(),
-                    "👨 SEXO/IDADE": formatar_sexo(sex), 
-                    "📍 LOCALIDADE": loc.title(), 
-                    "🏠 MORADA": mor.title(),
-                    "🚒 MEIOS": ", ".join(meios), 
-                    "👨🏻‍🚒 OPERACIONAIS": ", ".join(nomes),
-                    "🚨 OUTROS MEIOS": out.title(), 
-                    "📅 DATA DO ENVIO": data_agora
+                    "numero": nr.upper(), "hora": formatar_hora(hr), "motivo": mot.title(),
+                    "sexo": formatar_sexo(sex), "localidade": loc.title(), "morada": mor.title(),
+                    "meios": ", ".join(meios), "operacionais": ", ".join(nomes),
+                    "outros": out.title(), "data_envio": data_agora
                 }
                 
-                st.session_state.db_ocorrencias.append(nova_linha)
-                
-                
-                dados_discord = nova_linha.copy()
-                del dados_discord["📅 DATA DO ENVIO"]
-
-                msg_discord = "\n".join([f"**{k}** ▶️ {v}" for k, v in dados_discord.items()])
-
-                
-                requests.post(DISCORD_WEBHOOK_URL, json={"content": msg_discord})
-                st.success("✅ Enviado com sucesso!")
+                try:
+                    # 2. Gravar no Supabase (Permanente)
+                    supabase.table("ocorrencias").insert(nova_linha).execute()
+                    
+                    # 3. Enviar para o Discord (Estético)
+                    del nova_linha["data_envio"] # Não enviar data para o Discord como pedido
+                    msg_discord = "\n".join([f"**{k.upper()}** ▶️ {v}" for k, v in nova_linha.items()])
+                    requests.post(DISCORD_WEBHOOK_URL, json={"content": msg_discord})
+                    
+                    st.success("✅ Guardado na Base de Dados e enviado!")
+                except Exception as e:
+                    st.error(f"❌ Erro ao guardar: {e}")
             else:
                 st.error("⚠️ Preencha todos os campos!")
 
@@ -135,28 +134,26 @@ with t2:
             if u == ADMIN_USER and s == ADMIN_PASSWORD:
                 st.session_state.autenticado = True
                 st.rerun()
-            else: st.error("Incorreto.")
     else:
         st.sidebar.button("Sair", on_click=lambda: st.session_state.update({"autenticado": False}))
         
-        if st.session_state.db_ocorrencias:
-            df = pd.DataFrame(st.session_state.db_ocorrencias)
-            
-            st.subheader("📊 Totais por Mês")
-            df_resumo = df.copy()
-            df_resumo['Mês'] = df_resumo['📅 DATA DO ENVIO'].apply(mes_extenso)
-            st.table(df_resumo.groupby('Mês').size().reset_index(name='Ocorrências'))
+        # 4. Ler do Supabase (Mesmo após reboot)
+        try:
+            res = supabase.table("ocorrencias").select("*").order("data_envio", desc=True).execute()
+            if res.data:
+                df = pd.DataFrame(res.data)
+                
+                st.subheader("📊 Totais por Mês")
+                df['Mês'] = df['data_envio'].apply(mes_extenso)
+                st.table(df.groupby('Mês').size().reset_index(name='Ocorrências'))
 
-            st.subheader("📋 Histórico desta Sessão")
-            st.dataframe(df, width='stretch')
-            
-            st.download_button("📥 Descarregar Excel Oficial", criar_excel_oficial(df), f"BVI_{datetime.now().year}.xlsx", width='stretch')
-        else:
-            st.info("Histórico local vazio.")
+                st.subheader("📋 Histórico Permanente")
+                st.dataframe(df, width='stretch')
+                
+                st.download_button("📥 Excel Oficial", criar_excel_oficial(df), f"BVI_{datetime.now().year}.xlsx", width='stretch')
+            else:
+                st.info("A base de dados ainda não tem registos.")
+        except Exception as e:
+            st.error(f"Erro ao carregar dados: {e}")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
-
-
-
-
-
