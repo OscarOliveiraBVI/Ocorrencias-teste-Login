@@ -29,11 +29,8 @@ def limpar_texto(txt):
 def formatar_sexo(texto):
     if not texto.strip(): return "Não especificado"
     t_upper = texto.strip().upper()
-    
-    # Se já tiver a palavra completa, não duplica
     if "MASCULINO" in t_upper or "FEMININO" in t_upper:
         return texto.strip().capitalize()
-        
     genero = "Masculino" if t_upper.startswith("M") else "Feminino" if t_upper.startswith("F") else ""
     if genero:
         idade = ''.join(filter(str.isdigit, t_upper))
@@ -60,8 +57,6 @@ def criar_excel_oficial(df):
         workbook, worksheet = writer.book, writer.sheets['Ocorrências']
         fmt_header = workbook.add_format({'bold': True, 'bg_color': '#1F4E78', 'font_color': 'white', 'border': 1})
         worksheet.write('C2', 'RELATÓRIO OFICIAL BVI', workbook.add_format({'bold': True, 'font_size': 14}))
-        if os.path.exists(LOGO_FILE):
-            worksheet.insert_image('A1', LOGO_FILE, {'x_scale': 0.4, 'y_scale': 0.4})
         for col_num, value in enumerate(df.columns.values):
             worksheet.write(5, col_num, value, fmt_header)
             worksheet.set_column(col_num, col_num, 22)
@@ -70,14 +65,20 @@ def criar_excel_oficial(df):
 # --- INTERFACE ---
 st.set_page_config(page_title="BVI - Ocorrências", page_icon="logo.png", layout="centered")
 
-st.title("🚒 Sistema BVI")
+# MOSTRAR UTILIZADOR NA SIDEBAR SE ESTIVER LOGADO
+if st.session_state.get("autenticado", False):
+    st.sidebar.markdown(f"👤 **Utilizador:** {ADMIN_USER}")
+    st.sidebar.button("Sair", on_click=lambda: st.session_state.update({"autenticado": False}))
+
+st.title("🚒 Registo de Ocorrências")
 t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 
 with t1:
     with st.form("f_novo", clear_on_submit=True):
         st.subheader("Nova Ocorrência:")
-        nr = st.text_input("📕 OCORRÊNCIA Nº")
-        hr = st.text_input("🕜 HORA")
+        c1, c2 = st.columns(2)
+        nr = c1.text_input("📕 OCORRÊNCIA Nº")
+        hr = c2.text_input("🕜 HORA")
         mot = st.text_input("🦺 MOTIVO") 
         sex = st.text_input("👨 SEXO/IDADE") 
         loc = st.text_input("📍 LOCALIDADE")
@@ -103,10 +104,8 @@ with t1:
                 }
                 
                 try:
-                    # Grava no Supabase
                     supabase.table("ocorrencias").insert(nova_linha).execute()
                     
-                    # Discord (SEM data e COM nomes visuais)
                     dados_discord = nova_linha.copy()
                     del dados_discord["data_envio"]
                     
@@ -127,15 +126,15 @@ with t1:
 
 with t2:
     if not st.session_state.get("autenticado", False):
-        u = st.text_input("Utilizador", key="u_login")
-        s = st.text_input("Senha", type="password", key="s_login")
+        u = st.text_input("Utilizador", key="u_log")
+        s = st.text_input("Senha", type="password", key="s_log")
         if st.button("Entrar"):
             if u == ADMIN_USER and s == ADMIN_PASSWORD:
                 st.session_state.autenticado = True
                 st.rerun()
+            else:
+                st.error("Incorreto.")
     else:
-        st.sidebar.button("Sair", on_click=lambda: st.session_state.update({"autenticado": False}))
-        
         try:
             res = supabase.table("ocorrencias").select("*").order("data_envio", desc=True).execute()
             if res.data:
@@ -164,7 +163,3 @@ with t2:
             st.error(f"❌ Erro: {e}")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
-
-
-
-
