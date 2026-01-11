@@ -24,21 +24,19 @@ def limpar_texto(txt):
     return ''.join(c for c in unicodedata.normalize('NFD', txt) 
                   if unicodedata.category(c) != 'Mn').upper()
 
+def apenas_numeros(txt):
+    return ''.join(filter(str.isdigit, txt))
+
 def formatar_sexo(texto):
     if not texto.strip(): return "Não especificado"
     t_upper = texto.strip().upper()
-    
-    # Extrair apenas os números (idade)
     idade = ''.join(filter(str.isdigit, t_upper))
-    
-    # Verificar apenas a primeira letra para definir o género
     if t_upper.startswith("F"):
         genero = "Feminino"
     elif t_upper.startswith("M"):
         genero = "Masculino"
     else:
-        return texto.capitalize() # Caso não comece por M ou F, mantém o que foi escrito
-        
+        return texto.capitalize()
     return f"{genero} de {idade} anos" if idade else genero
 
 def formatar_hora(texto):
@@ -69,7 +67,6 @@ def criar_excel_oficial(df):
 # --- INTERFACE ---
 st.set_page_config(page_title="BVI - Gestão", page_icon="🚒", layout="wide")
 
-# MOSTRAR UTILIZADOR NA SIDEBAR SE ESTIVER LOGADO
 if st.session_state.get("autenticado", False):
     st.sidebar.markdown(f"👤 **Utilizador:** {ADMIN_USER}")
     st.sidebar.button("Sair", on_click=lambda: st.session_state.update({"autenticado": False}))
@@ -100,11 +97,20 @@ with t1:
                 nomes = [mapa[n] for n in ops]
                 data_agora = datetime.now().strftime("%d/%m/%Y %H:%M")
                 
+                # Extrai apenas os números da ocorrência
+                numero_limpo = apenas_numeros(nr)
+                
                 nova_linha = {
-                    "numero": nr.upper(), "hora": formatar_hora(hr), "motivo": mot.title(),
-                    "sexo": formatar_sexo(sex), "localidade": loc.title(), "morada": mor.title(),
-                    "meios": ", ".join(meios), "operacionais": ", ".join(nomes),
-                    "outros": out.title(), "data_envio": data_agora
+                    "numero": numero_limpo, 
+                    "hora": formatar_hora(hr), 
+                    "motivo": mot.title(),
+                    "sexo": formatar_sexo(sex), 
+                    "localidade": loc.title(), 
+                    "morada": mor.title(),
+                    "meios": ", ".join(meios), 
+                    "operacionais": ", ".join(nomes),
+                    "outros": out.title(), 
+                    "data_envio": data_agora
                 }
                 
                 try:
@@ -122,7 +128,7 @@ with t1:
                     msg = "\n".join([f"**{mapa_discord[k]}** ▶️ {v}" for k, v in dados_discord.items()])
                     requests.post(DISCORD_WEBHOOK_URL, json={"content": msg})
                     
-                    st.success("✅ Sucesso!")
+                    st.success(f"✅ Ocorrência {numero_limpo} guardada!")
                 except Exception as e:
                     st.error(f"❌ Erro ao guardar: {e}")
             else:
@@ -143,7 +149,6 @@ with t2:
             res = supabase.table("ocorrencias").select("*").order("data_envio", desc=True).execute()
             if res.data:
                 df = pd.DataFrame(res.data)
-                
                 mapa_colunas = {
                     "numero": "📕 OCORRÊNCIA Nº", "hora": "🕜 HORA", "motivo": "🦺 MOTIVO",
                     "sexo": "👨 SEXO/IDADE", "localidade": "📍 LOCALIDADE", "morada": "🏠 MORADA",
@@ -151,15 +156,12 @@ with t2:
                     "outros": "🚨 OUTROS MEIOS", "data_envio": "📅 DATA DO ENVIO"
                 }
                 df_v = df.rename(columns=mapa_colunas)
-
                 st.subheader("📊 Totais")
                 df_v['Mês'] = df_v['📅 DATA DO ENVIO'].apply(mes_extenso)
                 st.table(df_v.groupby('Mês').size().reset_index(name='Total'))
-
                 st.subheader("📋 Histórico")
                 if 'id' in df_v.columns: df_v = df_v.drop(columns=['id'])
                 st.dataframe(df_v, use_container_width=True)
-                
                 st.download_button("📥 Excel Oficial", criar_excel_oficial(df_v), f"BVI_{datetime.now().year}.xlsx")
             else:
                 st.info("Vazio.")
@@ -167,3 +169,4 @@ with t2:
             st.error(f"❌ Erro: {e}")
 
 st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+
