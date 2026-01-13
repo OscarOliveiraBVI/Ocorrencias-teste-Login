@@ -106,8 +106,8 @@ with t1:
         out = st.text_input("🚨 OUTROS MEIOS", value="Nenhum")
         
         if st.form_submit_button("SUBMETER", width='stretch'):
-            # CORREÇÃO: Adicionado 'sex' na verificação de campos obrigatórios
-            if nr and hr and mot and sex and loc and mor and meios and ops:
+            # Sexo/Idade NÃO está nesta verificação, logo não é obrigatório
+            if nr and hr and mot and loc and mor and meios and ops:
                 nomes_completos = [mapa_nomes[n] for n in ops]
                 data_agora = datetime.now().strftime("%d/%m/%Y %H:%M")
                 
@@ -120,12 +120,13 @@ with t1:
                     nome_campo_nr = "📕 OCORRÊNCIA Nº"
                 
                 numero_limpo = apenas_numeros(nr)
+                valor_sexo = formatar_sexo(sex)
                 
                 nova_linha = {
                     "numero": numero_limpo, 
                     "hora": formatar_hora(hr), 
                     "motivo": mot.title(),
-                    "sexo": formatar_sexo(sex),
+                    "sexo": valor_sexo,
                     "localidade": loc.title(), 
                     "morada": mor.title(),
                     "meios": ", ".join(meios), 
@@ -135,8 +136,10 @@ with t1:
                 }
                 
                 try:
+                    # Guarda sempre no Supabase para o histórico
                     supabase.table("Ocorrências_Teste").insert(nova_linha).execute()
                     
+                    # Preparação para o Discord
                     dados_discord = nova_linha.copy()
                     del dados_discord["data_envio"]
                     
@@ -146,14 +149,21 @@ with t1:
                         "meios": "🚒 MEIOS", "operacionais": "👨🏻‍🚒 OPERACIONAIS", "outros": "🚨 OUTROS MEIOS"
                     }
                     
-                    msg_discord = "\n".join([f"**{mapa_labels[k]}** ▶️ {v}" for k, v in dados_discord.items()])
+                    # CONSTRUÇÃO DA MENSAGEM: Filtra o campo sexo se for "Não Aplicável"
+                    linhas_msg = []
+                    for k, v in dados_discord.items():
+                        if k == "sexo" and v == "Não Aplicável":
+                            continue  # Salta esta linha e não adiciona à mensagem
+                        linhas_msg.append(f"**{mapa_labels[k]}** ▶️ {v}")
+                    
+                    msg_discord = "\n".join(linhas_msg)
                     requests.post(DISCORD_WEBHOOK_URL, json={"content": msg_discord})
                     
                     st.success(f"✅ {nome_campo_nr.replace('📕 ', '')} {numero_limpo} guardado!")
                 except Exception as e:
                     st.error(f"❌ Erro ao guardar: {e}")
             else:
-                st.error("⚠️ Preencha todos os campos, incluindo Sexo/Idade!")
+                st.error("⚠️ Preencha os campos obrigatórios (Nº, Hora, Motivo, Localidade, Morada, Meios e Operacionais)!")
 
 with t2:
     if not st.session_state.get("autenticado", False):
