@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 from supabase import create_client, Client
 
-
+# Configuração de Segurança e Conexão
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
@@ -20,8 +20,7 @@ except Exception as e:
     st.error("⚠️ Verifica os Secrets no Streamlit Cloud!")
     st.stop()
 
-
-
+# Funções Auxiliares
 def limpar_texto(txt):
     return ''.join(c for c in unicodedata.normalize('NFD', txt) 
                   if unicodedata.category(c) != 'Mn').upper()
@@ -31,7 +30,7 @@ def apenas_numeros(txt):
 
 def formatar_sexo(texto):
     if not texto or not texto.strip(): 
-        return "Não Aplicavel"
+        return "Não Aplicável"
     
     t_upper = texto.strip().upper()
     idade = ''.join(filter(str.isdigit, t_upper))
@@ -72,8 +71,8 @@ def criar_excel_oficial(df):
             worksheet.set_column(col_num, col_num, 22)
     return output.getvalue()
 
-
-st.set_page_config(page_title="BVI - Ocorrências", page_icon="🚒", layout="centered")
+# Layout da Página
+st.set_page_config(page_title="BVI - Ocorrências", page_icon="logo.png", layout="centered")
 
 if st.session_state.get("autenticado", False):
     st.sidebar.markdown(f"👤 **Utilizador:** {ADMIN_USER}")
@@ -82,14 +81,11 @@ if st.session_state.get("autenticado", False):
         st.rerun()
 
 col1, col2 = st.columns([1, 5])
-
 with col1:
-    # Mostra a imagem. O parâmetro 'use_container_width' faz a imagem ajustar-se à coluna
     st.image("logo.png", width=90)
-
 with col2:
-    # Mostra o título alinhado ao lado da imagem
     st.title("Registo de Ocorrências")
+
 t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 
 with t1:
@@ -110,7 +106,8 @@ with t1:
         out = st.text_input("🚨 OUTROS MEIOS", value="Nenhum")
         
         if st.form_submit_button("SUBMETER", width='stretch'):
-            if nr and hr and mot and loc and mor and meios and ops:
+            # CORREÇÃO: Adicionado 'sex' na verificação de campos obrigatórios
+            if nr and hr and mot and sex and loc and mor and meios and ops:
                 nomes_completos = [mapa_nomes[n] for n in ops]
                 data_agora = datetime.now().strftime("%d/%m/%Y %H:%M")
                 
@@ -138,7 +135,6 @@ with t1:
                 }
                 
                 try:
-                    
                     supabase.table("Ocorrências_Teste").insert(nova_linha).execute()
                     
                     dados_discord = nova_linha.copy()
@@ -157,7 +153,7 @@ with t1:
                 except Exception as e:
                     st.error(f"❌ Erro ao guardar: {e}")
             else:
-                st.error("⚠️ Preencha os campos obrigatórios!")
+                st.error("⚠️ Preencha todos os campos, incluindo Sexo/Idade!")
 
 with t2:
     if not st.session_state.get("autenticado", False):
@@ -169,7 +165,6 @@ with t2:
                 st.rerun()
     else:
         try:
-           
             res = supabase.table("Ocorrências_Teste").select("*").order("data_envio", desc=True).execute()
             if res.data:
                 df = pd.DataFrame(res.data)
@@ -191,7 +186,3 @@ with t2:
             st.error(f"❌ Erro ao carregar: {e}")
 
 st.markdown(f'<div style="text-align: center; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
-
-
-
-
