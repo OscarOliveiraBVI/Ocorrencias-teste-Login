@@ -106,16 +106,18 @@ with t1:
         out = st.text_input("🚨 OUTROS MEIOS", value="Nenhum")
         
         if st.form_submit_button("SUBMETER", width='stretch'):
-            # Sexo/Idade NÃO está nesta verificação, logo não é obrigatório
             if nr and hr and mot and loc and mor and meios and ops:
                 nomes_completos = [mapa_nomes[n] for n in ops]
                 data_agora = datetime.now().strftime("%d/%m/%Y %H:%M")
                 
                 nr_upper = nr.upper()
+                esconder_sexo = False
+                
                 if "CODU" in nr_upper:
                     nome_campo_nr = "📕 CODU Nº"
                 elif "CDO'S" in nr_upper or "CSRTTM" in nr_upper:
                     nome_campo_nr = "📕 CSRTTM Nº"
+                    esconder_sexo = True # Marcar para esconder se for CSRTTM/CDO'S
                 else:
                     nome_campo_nr = "📕 OCORRÊNCIA Nº"
                 
@@ -136,10 +138,10 @@ with t1:
                 }
                 
                 try:
-                    # Guarda sempre no Supabase para o histórico
+                    # Salva sempre tudo no histórico (Supabase)
                     supabase.table("Ocorrências_Teste").insert(nova_linha).execute()
                     
-                    # Preparação para o Discord
+                    # Preparação da mensagem para o Discord
                     dados_discord = nova_linha.copy()
                     del dados_discord["data_envio"]
                     
@@ -149,11 +151,11 @@ with t1:
                         "meios": "🚒 MEIOS", "operacionais": "👨🏻‍🚒 OPERACIONAIS", "outros": "🚨 OUTROS MEIOS"
                     }
                     
-                    # CONSTRUÇÃO DA MENSAGEM: Filtra o campo sexo se for "Não Aplicável"
                     linhas_msg = []
                     for k, v in dados_discord.items():
-                        if k == "sexo" and v == "Não Aplicável":
-                            continue  # Salta esta linha e não adiciona à mensagem
+                        # REGRA: Se for CSRTTM e o sexo for "Não Aplicável", ignora a linha no Discord
+                        if k == "sexo" and esconder_sexo and v == "Não Aplicável":
+                            continue
                         linhas_msg.append(f"**{mapa_labels[k]}** ▶️ {v}")
                     
                     msg_discord = "\n".join(linhas_msg)
@@ -163,7 +165,7 @@ with t1:
                 except Exception as e:
                     st.error(f"❌ Erro ao guardar: {e}")
             else:
-                st.error("⚠️ Preencha os campos obrigatórios (Nº, Hora, Motivo, Localidade, Morada, Meios e Operacionais)!")
+                st.error("⚠️ Preencha os campos obrigatórios!")
 
 with t2:
     if not st.session_state.get("autenticado", False):
