@@ -31,7 +31,7 @@ def apenas_numeros(txt):
 
 def formatar_sexo(texto):
     if not texto or not texto.strip(): 
-        return "Não especificado"
+        return "Não Aplicavel"
     
     t_upper = texto.strip().upper()
     idade = ''.join(filter(str.isdigit, t_upper))
@@ -110,8 +110,8 @@ with t1:
                 nr_upper = nr.upper()
                 if "CODU" in nr_upper:
                     nome_campo_nr = "📕 CODU Nº"
-                elif "CDO" in nr_upper or "CSRTTM" in nr_upper:
-                    nome_campo_nr = "📕 CDO's Nº"
+                elif "CDO'S" in nr_upper or "CSRTTM" in nr_upper or "cdo's" in nr_upper:
+                    nome_campo_nr = "📕 CSRTTM Nº"
                 else:
                     nome_campo_nr = "📕 OCORRÊNCIA Nº"
                 
@@ -182,5 +182,6 @@ with t2:
             st.error(f"❌ Erro ao carregar: {e}")
 
 st.markdown(f'<div style="text-align: center; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+
 
 
