@@ -20,6 +20,8 @@ except Exception as e:
     st.error("⚠️ Verifica os Secrets no Streamlit Cloud!")
     st.stop()
 
+# --- FUNÇÕES DE AJUDA ---
+
 def limpar_texto(txt):
     return ''.join(c for c in unicodedata.normalize('NFD', txt) 
                   if unicodedata.category(c) != 'Mn').upper()
@@ -28,20 +30,25 @@ def apenas_numeros(txt):
     return ''.join(filter(str.isdigit, txt))
 
 def formatar_sexo(texto):
-    if not texto.strip(): return "Não especificado"
+    if not texto or not texto.strip(): 
+        return "Não especificado"
+    
     t_upper = texto.strip().upper()
     idade = ''.join(filter(str.isdigit, t_upper))
+    
     if t_upper.startswith("F"):
         genero = "Feminino"
     elif t_upper.startswith("M"):
         genero = "Masculino"
     else:
         return texto.capitalize()
+    
     return f"{genero} de {idade} anos" if idade else genero
 
 def formatar_hora(texto):
     t = texto.strip().replace(":", "").replace(".", "")
-    if len(t) == 4 and t.isdigit(): return f"{t[:2]}:{t[2:]}"
+    if len(t) == 4 and t.isdigit(): 
+        return f"{t[:2]}:{t[2:]}"
     return texto
 
 def mes_extenso(dt_str):
@@ -50,7 +57,8 @@ def mes_extenso(dt_str):
     try:
         dt = datetime.strptime(dt_str, "%d/%m/%Y %H:%M")
         return f"{meses[dt.month]} de {dt.year}"
-    except: return "Data Inválida"
+    except: 
+        return "Data Inválida"
 
 def criar_excel_oficial(df):
     output = io.BytesIO()
@@ -64,12 +72,14 @@ def criar_excel_oficial(df):
             worksheet.set_column(col_num, col_num, 22)
     return output.getvalue()
 
-# --- INTERFACE ---
-st.set_page_config(page_title="BVI - Ocorrências", page_icon="logo.png", layout="centered")
+# --- INTERFACE PRINCIPAL ---
+st.set_page_config(page_title="BVI - Ocorrências", page_icon="🚒", layout="centered")
 
 if st.session_state.get("autenticado", False):
     st.sidebar.markdown(f"👤 **Utilizador:** {ADMIN_USER}")
-    st.sidebar.button("Sair", on_click=lambda: st.session_state.update({"autenticado": False}))
+    if st.sidebar.button("Sair"):
+        st.session_state.autenticado = False
+        st.rerun()
 
 st.title("🚒 Registo de Ocorrências")
 t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
@@ -77,38 +87,45 @@ t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 with t1:
     with st.form("f_novo", clear_on_submit=True):
         st.subheader("Nova Ocorrência:")
-        nr = st.text_input("📕 OCORRÊNCIA Nº")
+        nr = st.text_input("📕 OCORRÊNCIA Nº / CODU / CDO")
         hr = st.text_input("🕜 HORA")
         mot = st.text_input("🦺 MOTIVO") 
-        sex = st.text_input("👨 SEXO/IDADE") 
+        sex = st.text_input("👨 SEXO/IDADE (Opcional)") 
         loc = st.text_input("📍 LOCALIDADE")
         mor = st.text_input("🏠 MORADA")
         
         pessoal = sorted(["Luis Esmenio", "Denis Moreira", "Rafael Fernandes", "Marcia Mondego", "Rui Parada", "Francisco Ferreira", "Pedro Veiga", "Rui Dias", "Artur Lima", "Óscar Oliveira", "Carlos Mendes", "Eric Mauricio", "José Melgo", "Andreia Afonso", "Roney Menezes", "EIP1", "EIP2", "Daniel Fernandes", "Danitiele Menezes", "Diogo Costa", "David Choupina", "Manuel Pinto", "Paulo Veiga", "Ana Maria", "Artur Parada", "Jose Fernandes", "Emilia Melgo", "Alex Gralhos", "Ricardo Costa", "Óscar Esmenio", "D. Manuel Pinto", "Rui Domingues"])
-        mapa = {limpar_texto(n): n for n in pessoal}
+        mapa_nomes = {limpar_texto(n): n for n in pessoal}
         
         meios = st.multiselect("🚒 MEIOS", ["ABSC-03", "ABSC-04", "VFCI-04", "VFCI-05","VUCI-02", "VTTU-01", "VTTU-02", "VCOT-02","VLCI-01", "VLCI-03", "VETA-02"])
-        ops = st.multiselect("👨🏻‍🚒 OPERACIONAIS", sorted(list(mapa.keys())))
+        ops = st.multiselect("👨🏻‍🚒 OPERACIONAIS", sorted(list(mapa_nomes.keys())))
         out = st.text_input("🚨 OUTROS MEIOS", value="Nenhum")
         
         if st.form_submit_button("SUBMETER", width='stretch'):
             if nr and hr and mot and loc and mor and meios and ops:
-                nomes = [mapa[n] for n in ops]
+                nomes_completos = [mapa_nomes[n] for n in ops]
                 data_agora = datetime.now().strftime("%d/%m/%Y %H:%M")
                 
-                # Verifica se o utilizador escreveu "CODU" no campo
-                e_codu = "CODU" in nr.upper()
+                # --- LÓGICA DE DETEÇÃO DE TIPO DE OCORRÊNCIA ---
+                nr_upper = nr.upper()
+                if "CODU" in nr_upper:
+                    nome_campo_nr = "📕 CODU Nº"
+                elif "CDO" in nr_upper or "CSRTTM" in nr_upper:
+                    nome_campo_nr = "📕 CDO's Nº"
+                else:
+                    nome_campo_nr = "📕 OCORRÊNCIA Nº"
+                
                 numero_limpo = apenas_numeros(nr)
                 
                 nova_linha = {
                     "numero": numero_limpo, 
                     "hora": formatar_hora(hr), 
                     "motivo": mot.title(),
-                    "sexo": formatar_sexo(sex), 
+                    "sexo": formatar_sexo(sex),
                     "localidade": loc.title(), 
                     "morada": mor.title(),
                     "meios": ", ".join(meios), 
-                    "operacionais": ", ".join(nomes),
+                    "operacionais": ", ".join(nomes_completos),
                     "outros": out.title(), 
                     "data_envio": data_agora
                 }
@@ -119,29 +136,20 @@ with t1:
                     dados_discord = nova_linha.copy()
                     del dados_discord["data_envio"]
                     
-                    # Se for CODU, altera o nome do campo apenas no Discord
-                    nome_campo_nr = "📕 CODU Nº" if e_codu else "📕 OCORRÊNCIA Nº"
-                    
-                    mapa_discord = {
-                        "numero": nome_campo_nr, 
-                        "hora": "🕜 HORA", 
-                        "motivo": "🦺 MOTIVO",
-                        "sexo": "👨 SEXO/IDADE", 
-                        "localidade": "📍 LOCALIDADE", 
-                        "morada": "🏠 MORADA",
-                        "meios": "🚒 MEIOS", 
-                        "operacionais": "👨🏻‍🚒 OPERACIONAIS", 
-                        "outros": "🚨 OUTROS MEIOS"
+                    mapa_labels = {
+                        "numero": nome_campo_nr, "hora": "🕜 HORA", "motivo": "🦺 MOTIVO",
+                        "sexo": "👨 SEXO/IDADE", "localidade": "📍 LOCALIDADE", "morada": "🏠 MORADA",
+                        "meios": "🚒 MEIOS", "operacionais": "👨🏻‍🚒 OPERACIONAIS", "outros": "🚨 OUTROS MEIOS"
                     }
                     
-                    msg = "\n".join([f"**{mapa_discord[k]}** ▶️ {v}" for k, v in dados_discord.items()])
-                    requests.post(DISCORD_WEBHOOK_URL, json={"content": msg})
+                    msg_discord = "\n".join([f"**{mapa_labels[k]}** ▶️ {v}" for k, v in dados_discord.items()])
+                    requests.post(DISCORD_WEBHOOK_URL, json={"content": msg_discord})
                     
                     st.success(f"✅ {nome_campo_nr.replace('📕 ', '')} {numero_limpo} guardado!")
                 except Exception as e:
-                    st.error(f"❌ Erro ao guardar: {e}")
+                    st.error(f"❌ Erro: {e}")
             else:
-                st.error("⚠️ Preencha todos os campos!")
+                st.error("⚠️ Preencha os campos obrigatórios!")
 
 with t2:
     if not st.session_state.get("autenticado", False):
@@ -170,10 +178,7 @@ with t2:
                 if 'id' in df_v.columns: df_v = df_v.drop(columns=['id'])
                 st.dataframe(df_v, use_container_width=True)
                 st.download_button("📥 Excel Oficial", criar_excel_oficial(df_v), f"BVI_{datetime.now().year}.xlsx")
-            else:
-                st.info("Vazio.")
         except Exception as e:
-            st.error(f"❌ Erro: {e}")
+            st.error(f"❌ Erro ao carregar: {e}")
 
-st.markdown(f'<div style="text-align: right; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
-
+st.markdown(f'<div style="text-align: center; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
