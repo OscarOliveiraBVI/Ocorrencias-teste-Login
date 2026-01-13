@@ -81,7 +81,7 @@ if st.session_state.get("autenticado", False):
         st.session_state.autenticado = False
         st.rerun()
 
-st.title("🚒 Registo de Ocorrências")
+st.title("title_icon="logo.png", Registo de Ocorrências")
 t1, t2 = st.tabs(["📝 Novo Registo", "🔐 Gestão"])
 
 with t1:
@@ -183,3 +183,4 @@ with t2:
             st.error(f"❌ Erro ao carregar: {e}")
 
 st.markdown(f'<div style="text-align: center; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
+
