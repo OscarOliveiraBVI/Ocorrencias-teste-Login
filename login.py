@@ -106,11 +106,10 @@ with t1:
                 nomes_completos = [mapa_nomes[n] for n in ops]
                 data_agora = datetime.now().strftime("%d/%m/%Y %H:%M")
                 
-                # --- LÓGICA DE DETEÇÃO DE TIPO DE OCORRÊNCIA ---
                 nr_upper = nr.upper()
                 if "CODU" in nr_upper:
                     nome_campo_nr = "📕 CODU Nº"
-                elif "CDO'S" in nr_upper or "CSRTTM" in nr_upper or "cdo's" in nr_upper:
+                elif "CDO'S" in nr_upper or "CSRTTM" in nr_upper:
                     nome_campo_nr = "📕 CSRTTM Nº"
                 else:
                     nome_campo_nr = "📕 OCORRÊNCIA Nº"
@@ -131,7 +130,8 @@ with t1:
                 }
                 
                 try:
-                    supabase.table("ocorrencias").insert(nova_linha).execute()
+                    # ALTERAÇÃO AQUI: Nome da tabela com aspas duplas por causa do acento
+                    supabase.table('"Ocorrências_Teste"').insert(nova_linha).execute()
                     
                     dados_discord = nova_linha.copy()
                     del dados_discord["data_envio"]
@@ -147,7 +147,7 @@ with t1:
                     
                     st.success(f"✅ {nome_campo_nr.replace('📕 ', '')} {numero_limpo} guardado!")
                 except Exception as e:
-                    st.error(f"❌ Erro: {e}")
+                    st.error(f"❌ Erro ao guardar no banco: {e}")
             else:
                 st.error("⚠️ Preencha os campos obrigatórios!")
 
@@ -161,7 +161,8 @@ with t2:
                 st.rerun()
     else:
         try:
-            res = supabase.table("ocorrencias").select("*").order("data_envio", desc=True).execute()
+            # ALTERAÇÃO AQUI: Nome da tabela corrigido para a consulta também
+            res = supabase.table('"Ocorrências_Teste"').select("*").order("data_envio", desc=True).execute()
             if res.data:
                 df = pd.DataFrame(res.data)
                 mapa_colunas = {
@@ -182,6 +183,3 @@ with t2:
             st.error(f"❌ Erro ao carregar: {e}")
 
 st.markdown(f'<div style="text-align: center; color: gray; font-size: 0.8rem; margin-top: 50px;">{datetime.now().year} © BVI</div>', unsafe_allow_html=True)
-
-
-
