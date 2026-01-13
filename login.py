@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 from supabase import create_client, Client
 
-# --- CONFIGURAÇÃO E SEGREDOS ---
+
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
@@ -20,7 +20,7 @@ except Exception as e:
     st.error("⚠️ Verifica os Secrets no Streamlit Cloud!")
     st.stop()
 
-# --- FUNÇÕES DE AJUDA ---
+
 
 def limpar_texto(txt):
     return ''.join(c for c in unicodedata.normalize('NFD', txt) 
@@ -72,7 +72,7 @@ def criar_excel_oficial(df):
             worksheet.set_column(col_num, col_num, 22)
     return output.getvalue()
 
-# --- INTERFACE PRINCIPAL ---
+
 st.set_page_config(page_title="BVI - Ocorrências", page_icon="🚒", layout="centered")
 
 if st.session_state.get("autenticado", False):
@@ -130,8 +130,8 @@ with t1:
                 }
                 
                 try:
-                    # ALTERAÇÃO AQUI: Nome da tabela com aspas duplas por causa do acento
-                    supabase.table('"Ocorrências_Teste"').insert(nova_linha).execute()
+                    
+                    supabase.table("Ocorrências_Teste").insert(nova_linha).execute()
                     
                     dados_discord = nova_linha.copy()
                     del dados_discord["data_envio"]
@@ -147,7 +147,7 @@ with t1:
                     
                     st.success(f"✅ {nome_campo_nr.replace('📕 ', '')} {numero_limpo} guardado!")
                 except Exception as e:
-                    st.error(f"❌ Erro ao guardar no banco: {e}")
+                    st.error(f"❌ Erro ao guardar: {e}")
             else:
                 st.error("⚠️ Preencha os campos obrigatórios!")
 
@@ -161,8 +161,8 @@ with t2:
                 st.rerun()
     else:
         try:
-            # ALTERAÇÃO AQUI: Nome da tabela corrigido para a consulta também
-            res = supabase.table('"Ocorrências_Teste"').select("*").order("data_envio", desc=True).execute()
+           
+            res = supabase.table("Ocorrências_Teste").select("*").order("data_envio", desc=True).execute()
             if res.data:
                 df = pd.DataFrame(res.data)
                 mapa_colunas = {
